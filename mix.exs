@@ -29,7 +29,7 @@ defmodule Rackspace.Mixfile do
     [
       {:ibrowse, "~> 4.2"},
       {:httpotion, "~> 3.0"},
-      {:timex, "~> 3.0"},
+      {:timex, "~> 2.1"},
       {:poison, "~> 2.0"}
     ]
   end
