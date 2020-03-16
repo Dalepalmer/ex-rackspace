@@ -1,5 +1,5 @@
 defmodule Rackspace.Config do
-  require Logger
+  @me __MODULE__
 
   def start_link do
     config = Application.get_env(:rackspace, :api)
@@ -7,36 +7,23 @@ defmodule Rackspace.Config do
     password = config[:password] || System.get_env("RS_PASSWORD")
     api_key = config[:api_key] || System.get_env("RS_API_KEY")
 
-    Agent.start_link(fn -> 
-      %{
-        username: username,
-        password: password,
-        api_key: api_key
-      }
-    end, name: __MODULE__)
+    Agent.start_link(
+      fn ->
+        %{
+          username: username,
+          password: password,
+          api_key: api_key
+        }
+      end,
+      name: @me
+    )
   end
 
-  @doc """
-  Get Auth configuration values.
-  """
-  def get do
-    Agent.get(__MODULE__, &(&1))
-  end
+  def get, do: Agent.get(@me, & &1)
 
-  @doc """
-  Set Auth configuration values.
-  """
-  def set(value) do
-    Agent.update(__MODULE__, &(Map.merge(&1, value)))
-  end
+  def get(key), do: Agent.get(@me, &Map.get(&1, key))
 
-  @doc """
-  Get Auth configuration values in tuple format.
-  """
-  def get_tuples do
-    case Rackspace.Config.get do
-      nil -> []
-      tuples -> tuples |> Enum.map(fn({k, v}) -> {k, to_char_list(v)} end)
-    end
-  end
+  def set(%{} = changes), do: Agent.update(@me, &Map.merge(&1, changes))
+
+  def set(key, value), do: Agent.update(@me, &Map.put(&1, key, value))
 end
