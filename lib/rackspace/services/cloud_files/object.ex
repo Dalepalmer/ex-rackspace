@@ -38,7 +38,7 @@ defmodule Rackspace.CloudFiles.Object do
 
   @doc "Retrieves a single object from a container"
   @spec get(container :: String.t(), object :: String.t(), opts :: options()) ::
-          {:ok, t()} | {:error, Rackspace.Error.t()}
+          {:ok, DetailedObject.t()} | {:error, Rackspace.Error.t()}
   def get(container, object, opts \\ []) do
     with {:ok, %{body: data, env: env}} <- request_get(Path.join(container, object), opts) do
       params = %{
