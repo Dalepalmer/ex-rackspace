@@ -6,11 +6,15 @@ defmodule Rackspace.Deprecated.Mixfile do
       app: :rackspace,
       version: "0.1.0",
       elixir: "~> 1.8",
+      elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   def application do
     [
@@ -24,7 +28,7 @@ defmodule Rackspace.Deprecated.Mixfile do
       {:castore, "~> 0.1.0"},
       {:jason, "~> 1.1.2"},
       {:mint, "~> 1.0"},
-      {:timex, "~> 3.6.1"}
+      {:tesla, "~> 1.3.0"}
     ]
   end
 end
