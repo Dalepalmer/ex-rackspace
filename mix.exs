@@ -18,7 +18,7 @@ defmodule Rackspace.Deprecated.Mixfile do
 
   def application do
     [
-      applications: [:logger],
+      extra_applications: [:logger],
       mod: {Rackspace, []}
     ]
   end
