@@ -15,7 +15,11 @@ defmodule Rackspace.Identity do
          config <- Config.get(),
          credentials <- validate_auth!(config),
          body <- build_request(credentials),
-         {:ok, %Tesla.Env{body: resp}} <- post("tokens", body) do
+         {:ok, %Tesla.Env{body: resp, status: status}} <- post("tokens", body) do
+      unless status == 200 do
+        raise ConfigError, "password or api_key is invalid"
+      end
+
       Config.set(%{
         token: get_in(resp, ["access", "token", "id"]),
         expires_at: get_in(resp, ["access", "token", "expires"]),

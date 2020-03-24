@@ -17,32 +17,27 @@ defmodule Rackspace.CloudFiles.Container do
     field :name, :string
   end
 
-  # TODO: type `opt`
-  @type opt :: any()
-  @type options :: [opt]
-
   @doc "Lists all available containers"
-  @spec list(opts :: options()) :: {:ok, [t()]} | {:error, Rackspace.Error.t()}
-  def list(opts \\ []) do
-    with {:ok, %{body: containers}} <- request_get("/", opts) do
+  @spec list() :: {:ok, [t()]} | {:error, Rackspace.Error.t()}
+  def list do
+    with {:ok, %{body: containers}} <- request_get("/") do
       {:ok, cast(containers)}
     end
   end
 
   @doc "Updates a container"
-  @spec put(name :: String.t(), opts :: options()) ::
+  @spec put(name :: String.t(), changes :: map()) ::
           {:ok, :updated} | {:error, Rackspace.Error.t()}
-  def put(name, opts \\ []) do
-    with {:ok, _} <- request_put(name, opts) do
+  def put(name, changes) do
+    with {:ok, _} <- request_put(name, changes) do
       {:ok, :updated}
     end
   end
 
   @doc "Deletes a container"
-  @spec delete(name :: String.t(), opts :: options()) ::
-          {:ok, :deleted} | {:error, Rackspace.Error.t()}
-  def delete(name, opts \\ []) do
-    with {:ok, _} <- request_delete(name, opts) do
+  @spec delete(name :: String.t()) :: {:ok, :deleted} | {:error, Rackspace.Error.t()}
+  def delete(name) do
+    with {:ok, _} <- request_delete(name) do
       {:ok, :deleted}
     end
   end

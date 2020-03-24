@@ -1,54 +1,76 @@
 defmodule Rackspace.Api do
   alias Rackspace.Config
 
-  @headers [
-    {"user-agent", "ex-rackspace-v2"},
-    {"content-type", "application/json"},
-    {"accept", "application/json"}
-  ]
+  @raw_headers [{"user-agent", "ex-rackspace-v2"}]
+  @headers @raw_headers ++
+             [
+               {"content-type", "application/json"},
+               {"accept", "application/json"}
+             ]
   def headers, do: @headers
 
   defmacro __using__(opts \\ []) do
     service = Keyword.fetch!(opts, :service)
 
     quote do
-      defp client do
+      defp base_url do
         Rackspace.Identity.refresh()
 
         region = Application.get_env(:rackspace, :default_region) || Config.get(:default_region)
-        base_url = get_in(Config.get(:services), [unquote(service), region])
+        get_in(Config.get(:services), [unquote(service), region])
+      end
 
-        middleware = [
-          {Tesla.Middleware.BaseUrl, base_url},
-          {Tesla.Middleware.Headers, unquote(headers())},
+      defp raw_client do
+        Tesla.client([
+          {Tesla.Middleware.BaseUrl, base_url()},
+          {Tesla.Middleware.Headers, unquote(@raw_headers)},
+          {Tesla.Middleware.Timeout, timeout: 15_000},
+          Rackspace.Middleware.Auth
+        ])
+      end
+
+      defp client do
+        Tesla.client([
+          {Tesla.Middleware.BaseUrl, base_url()},
+          {Tesla.Middleware.Headers, unquote(@headers)},
           Rackspace.Middleware.Auth,
           Tesla.Middleware.JSON
-        ]
-
-        Tesla.client(middleware)
+        ])
       end
 
-      defp request_get(url, opts \\ []) do
+      defp request_get(url) do
         client()
-        |> Tesla.get(url, opts)
+        |> Tesla.get(url)
         |> handle_response()
       end
 
-      defp request_post(url, body, opts \\ []) do
-        client()
-        |> Tesla.post(url, body, opts)
+      defp request_get_raw(url) do
+        raw_client()
+        |> Tesla.get(url)
         |> handle_response()
       end
 
-      defp request_put(url, body, opts \\ []) do
+      defp request_post(url, body) do
         client()
-        |> Tesla.put(url, body, opts)
+        |> Tesla.post(url, body)
         |> handle_response()
       end
 
-      defp request_delete(url, opts \\ []) do
+      defp request_put(url, body) do
         client()
-        |> Tesla.delete(url, opts)
+        |> Tesla.put(url, body)
+        |> handle_response()
+      end
+
+      defp request_put_raw(url, body) do
+        raw_client()
+        |> Tesla.put(url, body)
+        |> handle_response()
+      end
+
+      defp request_delete(url) do
+        client()
+        |> Tesla.delete(url)
         |> handle_response()
       end
 

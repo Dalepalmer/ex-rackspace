@@ -23,24 +23,20 @@ defmodule Rackspace.CloudFiles.Object do
     field :last_modified, :naive_datetime
   end
 
-  # TODO: type `opt`
-  @type opt :: any()
-  @type options :: [opt]
-
   @doc "Lists all available objects in a container"
-  @spec list(container :: String.t(), opts :: options()) ::
+  @spec list(container :: String.t()) ::
           {:ok, [t()]} | {:error, Rackspace.Error.t()}
-  def list(container, opts \\ []) do
-    with {:ok, %{body: objects}} <- request_get(container, opts) do
+  def list(container) do
+    with {:ok, %{body: objects}} <- request_get(container) do
       {:ok, cast(objects)}
     end
   end
 
   @doc "Retrieves a single object from a container"
-  @spec get(container :: String.t(), object :: String.t(), opts :: options()) ::
+  @spec get(container :: String.t(), object :: String.t()) ::
           {:ok, DetailedObject.t()} | {:error, Rackspace.Error.t()}
-  def get(container, object, opts \\ []) do
-    with {:ok, %{body: data, env: env}} <- request_get(Path.join(container, object), opts) do
+  def get(container, object) do
+    with {:ok, %{body: data, env: env}} <- request_get_raw(Path.join(container, object)) do
       params = %{
         "container" => container,
         "name" => object,
@@ -58,10 +54,10 @@ defmodule Rackspace.CloudFiles.Object do
   end
 
   @doc "Uploads an object to a container"
-  @spec put(container :: String.t(), object :: String.t(), data :: any(), opts :: options()) ::
+  @spec put(container :: String.t(), object :: String.t(), data :: binary()) ::
           {:ok, :created} | {:error, Rackspace.Error.t()}
-  def put(container, object, data, opts \\ []) do
-    with {:ok, _} <- request_put(Path.join(container, object), data, opts) do
+  def put(container, object, data) do
+    with {:ok, _} <- request_put_raw(Path.join(container, object), data) do
       {:ok, :created}
     end
   end
@@ -69,20 +65,19 @@ defmodule Rackspace.CloudFiles.Object do
   @doc "Removes multiple objects from a container"
   @spec delete(
           container :: String.t(),
-          object_or_objects :: String.t() | [String.t()],
-          opts :: options()
+          object_or_objects :: String.t() | [String.t()]
         ) :: {:ok, :deleted} | {:ok, non_neg_integer()} | {:error, Rackspace.Error.t()}
-  def delete(container, object_or_objects, opts \\ [])
+  def delete(container, object_or_objects)
 
   # TODO: improve error handling
-  def delete(container, objects, opts) when is_list(objects) do
-    Enum.each(objects, &delete(container, &1, opts))
+  def delete(container, objects) when is_list(objects) do
+    Enum.each(objects, &delete(container, &1))
 
     {:ok, length(objects)}
   end
 
-  def delete(container, object, opts) do
-    with {:ok, _} <- request_delete(Path.join(container, object), opts) do
+  def delete(container, object) do
+    with {:ok, _} <- request_delete(Path.join(container, object)) do
       {:ok, :deleted}
     end
   end
