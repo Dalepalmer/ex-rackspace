@@ -2,11 +2,12 @@ defmodule Rackspace.Identity do
   use Tesla, only: [:post]
   require Logger
 
-  alias Rackspace.{Config, ConfigError, Api}
-
+  adapter Tesla.Adapter.Mint
   plug Tesla.Middleware.BaseUrl, "https://identity.api.rackspacecloud.com/v2.0"
   plug Tesla.Middleware.Headers, Api.headers()
   plug Tesla.Middleware.JSON
+
+  alias Rackspace.{Config, ConfigError, Api}
 
   def refresh(opts \\ []) do
     force = Keyword.get(opts, :force, false)

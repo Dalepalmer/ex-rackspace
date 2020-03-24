@@ -1,6 +1,8 @@
 defmodule Rackspace.Api do
   alias Rackspace.Config
 
+  @adapter {Tesla.Adapter.Mint, []}
+
   @raw_headers [{"user-agent", "ex-rackspace-v2"}]
   @headers @raw_headers ++
              [
@@ -21,21 +23,25 @@ defmodule Rackspace.Api do
       end
 
       defp raw_client do
-        Tesla.client([
+        middleware = [
           {Tesla.Middleware.BaseUrl, base_url()},
           {Tesla.Middleware.Headers, unquote(@raw_headers)},
           {Tesla.Middleware.Timeout, timeout: 15_000},
           Rackspace.Middleware.Auth
-        ])
+        ]
+
+        Tesla.client(middleware, unquote(@adapter))
       end
 
       defp client do
-        Tesla.client([
+        middleware = [
           {Tesla.Middleware.BaseUrl, base_url()},
           {Tesla.Middleware.Headers, unquote(@headers)},
           Rackspace.Middleware.Auth,
           Tesla.Middleware.JSON
-        ])
+        ]
+
+        Tesla.client(middleware, unquote(@adapter))
       end
 
       defp request_get(url) do
