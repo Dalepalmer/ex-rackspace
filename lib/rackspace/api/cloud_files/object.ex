@@ -71,6 +71,7 @@ defmodule Rackspace.Api.CloudFiles.Object do
   `opts` can contain:
     - `method`: "GET" to return the file.
     - `seconds`: How many seconds this URL should be valid.
+    - `expires`: The exact unix time to expire, in seconds.
     - `region`: The file region.
     - `filename`: Sets the `Content-Disposition` header for the returned file.
     - `inline`: Sets `Content-Disposition` to `inline` so the file won't be downloaded.
@@ -79,11 +80,11 @@ defmodule Rackspace.Api.CloudFiles.Object do
   """
   def temp_url(container, object, opts \\ []) do
     get_auth()
-    {method, opts} = Keyword.pop(opts, :method, "GET")
-    {seconds, opts} = Keyword.pop(opts, :seconds, 3600)
-    {region, opts} = Keyword.pop(opts, :region, Application.get_env(:rackspace, :default_region))
+    method = Keyword.get(opts, :method, "GET")
+    seconds = Keyword.get(opts, :seconds, 3600)
+    expires = Keyword.get(opts, :expires, DateTime.to_unix(DateTime.utc_now()) + seconds)
+    region = Keyword.get(opts, :region, Application.get_env(:rackspace, :default_region))
 
-    expires = DateTime.to_unix(DateTime.utc_now()) + seconds
     account_url = base_url(region)
     full_url = "#{account_url}/#{container}/#{object}"
     full_path = full_url |> URI.parse() |> Map.get(:path)
@@ -92,6 +93,7 @@ defmodule Rackspace.Api.CloudFiles.Object do
 
     query = 
       opts
+      |> Keyword.drop([:method, :seconds, :expires, :region])
       |> Keyword.put(:temp_url_sig, signature)
       |> Keyword.put(:temp_url_expires, expires)
 
