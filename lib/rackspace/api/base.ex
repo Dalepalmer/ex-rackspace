@@ -184,7 +184,12 @@ defmodule Rackspace.Api.Base do
         if Map.has_key?(temp_url_keys, account_url) do
           Map.get(temp_url_keys, account_url)
         else
-          temp_url_key = request_head(account_url)[:headers]["x-account-meta-temp-url-key"]
+          temp_url_key =
+            account_url
+            |> request_head()
+            |> Map.get(:headers)
+            |> get_in(["x-account-meta-temp-url-key"])
+
           Application.put_env(:rackspace, :temp_url_keys, Map.put(temp_url_keys, account_url, temp_url_key))
           temp_url_key
         end
