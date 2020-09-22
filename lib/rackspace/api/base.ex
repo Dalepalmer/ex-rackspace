@@ -88,6 +88,22 @@ defmodule Rackspace.Api.Base do
         end
       end
 
+      defp request_head(url, params \\ [], opts \\ []) do
+        case get_auth() do
+          %{token: token} when is_nil(token) == false ->
+            timeout = Application.get_env(:rackspace, :timeout) || 5_000
+            timeout = Keyword.get(opts, :timout, timeout)
+
+            url
+              |> query_params(params)
+              |> HTTPotion.head([headers: [
+                "X-Auth-Token": token,
+              ], timeout: timeout])
+          _ ->
+            %Rackspace.Error{code: 0, message: "token_expired"}
+        end
+      end
+
       defp request_get(url, params \\ [], opts \\ []) do
         case get_auth() do
           %{token: token} when is_nil(token) == false ->
@@ -161,6 +177,17 @@ defmodule Rackspace.Api.Base do
         Enum.reduce(params, url, fn({k,v}, acc) ->
           acc = "#{acc}&#{k}=#{v}"
         end)
+      end
+
+      defp get_temp_url_key(account_url) do
+        temp_url_keys = Application.get_env(:rackspace, :temp_url_keys, %{})
+        if Map.has_key?(temp_url_keys, account_url) do
+          Map.get(temp_url_keys, account_url)
+        else
+          temp_url_key = request_head(account_url)[:headers]["x-account-meta-temp-url-key"]
+          Application.put_env(:rackspace, :temp_url_keys, Map.put(temp_url_keys, account_url, temp_url_key))
+          temp_url_key
+        end
       end
     end
   end

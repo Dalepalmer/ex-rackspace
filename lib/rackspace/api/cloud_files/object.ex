@@ -65,6 +65,39 @@ defmodule Rackspace.Api.CloudFiles.Object do
     end
   end
 
+  @doc """
+  Get a public temporary URL for an object.
+
+  `opts` can contain:
+    - `method`: "GET" to return the file.
+    - `seconds`: How many seconds this URL should be valid.
+    - `region`: The file region.
+    - `filename`: Sets the `Content-Disposition` header for the returned file.
+    - `inline`: Sets `Content-Disposition` to `inline` so the file won't be downloaded.
+
+  @see https://docs.rackspace.com/docs/cloud-files/v1/use-cases/public-access-to-your-cloud-files-account/
+  """
+  def temp_url(container, object, opts \\ []) do
+    get_auth()
+    {method, opts} = Keyword.pop(opts, :method, "GET")
+    {seconds, opts} = Keyword.pop(opts, :seconds, 3600)
+    {region, opts} = Keyword.pop(opts, :region, Application.get_env(:rackspace, :default_region))
+
+    expires = DateTime.to_unix(DateTime.utc_now()) + seconds
+    account_url = base_url(region)
+    full_url = "#{account_url}/#{container}/#{object}"
+    full_path = full_url |> URI.parse() |> Map.get(:path)
+    hmac_body = "#{String.upcase(method)}\n#{expires}\n#{full_path}"
+    signature = :crypto.mac(:hmac, :sha256, get_temp_url_key(account_url), hmac_body) |> Base.encode16(case: :lower)
+
+    query = 
+      opts
+      |> Keyword.put(:temp_url_sig, signature)
+      |> Keyword.put(:temp_url_expires, expires)
+
+    "#{full_url}#{query_params("?", query)}"
+  end
+
   def put(container, name, data, opts \\ []) do
     get_auth()
     region = opts[:region] || Application.get_env(:rackspace, :default_region)
