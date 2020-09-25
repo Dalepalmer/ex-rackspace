@@ -89,7 +89,7 @@ defmodule Rackspace.Api.CloudFiles.Object do
     full_url = "#{account_url}/#{container}/#{object}"
     full_path = full_url |> URI.parse() |> Map.get(:path)
     hmac_body = "#{String.upcase(method)}\n#{expires}\n#{full_path}"
-    signature = :crypto.mac(:hmac, :sha256, get_temp_url_key(account_url), hmac_body) |> Base.encode16(case: :lower)
+    signature = :crypto.hmac(:sha256, get_temp_url_key(account_url), hmac_body) |> Base.encode16(case: :lower)
 
     query = 
       opts
