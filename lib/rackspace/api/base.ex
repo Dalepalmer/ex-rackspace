@@ -1,12 +1,12 @@
 defmodule Rackspace.Api.Base do
   @moduledoc ~S"""
-  Base module for service access. 
-  
-  It should be used as base module for any concrete implementation of specific service. 
+  Base module for service access.
+
+  It should be used as base module for any concrete implementation of specific service.
   When used, in module you need to specify which service it is implmenting so some function may now
   how to read configuration received from rackspace. For instance, base_url(region) is using service keyword
   to find what is the base url for such service
-  
+
   Possible services are:
   - `:autoscale`
   - `:cloud_servers_open_stack`
@@ -16,7 +16,7 @@ defmodule Rackspace.Api.Base do
   - `:cloud_databases`
   - `:cloud_dns`
   - `:cloud_feeds`
-  - `:cloud_files`        
+  - `:cloud_files`
   - `:cloud_files_cdn`
   - `:cloud_images`
   - `:cloud_load_balancers`
@@ -41,7 +41,7 @@ defmodule Rackspace.Api.Base do
       end
     end
     ```
-  """ 
+  """
   defmacro __using__([service: service]) do
     quote do
       import unquote(__MODULE__)
@@ -66,7 +66,7 @@ defmodule Rackspace.Api.Base do
         auth = Rackspace.Config.get
         if auth[:token] == nil || expired?() do
           case Rackspace.Api.Identity.request do
-            {:ok } -> 
+            {:ok } ->
               Rackspace.Config.get
             {:error, error } ->
               raise "fail to authenticate"
@@ -84,7 +84,23 @@ defmodule Rackspace.Api.Base do
             # validation and conflict errors in case 4XX errors and 500 should have empty body
             {:error, %Rackspace.Error{code: resp.status_code, message: resp.body}}
           %HTTPotion.ErrorResponse{message: message} ->
-            {:error, %Rackspace.Error{code: 0, message: message}} 
+            {:error, %Rackspace.Error{code: 0, message: message}}
+        end
+      end
+
+      defp request_head(url, params \\ [], opts \\ []) do
+        case get_auth() do
+          %{token: token} when is_nil(token) == false ->
+            timeout = Application.get_env(:rackspace, :timeout) || 5_000
+            timeout = Keyword.get(opts, :timout, timeout)
+
+            url
+              |> query_params(params)
+              |> HTTPotion.head([headers: [
+                "X-Auth-Token": token,
+              ], timeout: timeout])
+          _ ->
+            %Rackspace.Error{code: 0, message: "token_expired"}
         end
       end
 
@@ -100,7 +116,7 @@ defmodule Rackspace.Api.Base do
                 "X-Auth-Token": token,
                 "Content-Type": "application/json"
               ], timeout: timeout])
-          _ -> 
+          _ ->
             %Rackspace.Error{code: 0, message: "token_expired"}
         end
       end
@@ -115,9 +131,9 @@ defmodule Rackspace.Api.Base do
               |> HTTPotion.post([headers: [
                 "X-Auth-Token": token
               ], body: body, timeout: timeout])
-          _ -> 
+          _ ->
             %Rackspace.Error{code: 0, message: "token_expired"}
-        end      
+        end
       end
 
       defp request_put(url, body \\ <<>>, params \\ [], opts \\ []) do
@@ -132,9 +148,9 @@ defmodule Rackspace.Api.Base do
                 "X-Auth-Token": token,
                 "X-Delete-After": expire_at
               ], body: body, timeout: timeout])
-          _ -> 
+          _ ->
             %Rackspace.Error{code: 0, message: "token_expired"}
-        end      
+        end
       end
 
       defp request_delete(url, params \\ [], opts \\ [], body \\ <<>>) do
@@ -144,7 +160,7 @@ defmodule Rackspace.Api.Base do
             accept = opts[:accept] || "application/json"
             timeout = Application.get_env(:rackspace, :timeout) || 5_000
             timeout = Keyword.get(opts, :timout, timeout)
-    
+
               url
                 |> query_params(params)
                 |> HTTPotion.delete([headers: [
@@ -152,7 +168,7 @@ defmodule Rackspace.Api.Base do
                   "Content-Type": content_type,
                   "Accept": accept
                 ], body: body, timeout: timeout])
-          _ -> 
+          _ ->
             %Rackspace.Error{code: 0, message: "token_expired"}
         end
       end
@@ -161,6 +177,22 @@ defmodule Rackspace.Api.Base do
         Enum.reduce(params, url, fn({k,v}, acc) ->
           acc = "#{acc}&#{k}=#{v}"
         end)
+      end
+
+      defp get_temp_url_key(account_url) do
+        temp_url_keys = Application.get_env(:rackspace, :temp_url_keys, %{})
+        if Map.has_key?(temp_url_keys, account_url) do
+          Map.get(temp_url_keys, account_url)
+        else
+          temp_url_key =
+            account_url
+            |> request_head()
+            |> Map.get(:headers)
+            |> get_in(["x-account-meta-temp-url-key"])
+
+          Application.put_env(:rackspace, :temp_url_keys, Map.put(temp_url_keys, account_url, temp_url_key))
+          temp_url_key
+        end
       end
     end
   end
