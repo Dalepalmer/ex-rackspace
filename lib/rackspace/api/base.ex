@@ -7,6 +7,7 @@ defmodule Rackspace.Api.Base do
   how to read configuration received from rackspace. For instance, base_url(region) is using service keyword
   to find what is the base url for such service
 
+
   Possible services are:
   - `:autoscale`
   - `:cloud_servers_open_stack`
@@ -42,48 +43,53 @@ defmodule Rackspace.Api.Base do
     end
     ```
   """
-  defmacro __using__([service: service]) do
+  defmacro __using__(service: service) do
     quote do
       import unquote(__MODULE__)
       require Logger
 
       defp base_url(region, opts \\ []) do
         Application.get_env(:rackspace, unquote(service))
-          |> Keyword.get(:endpoints)
-          |> Enum.find(fn(ep) -> String.downcase(ep["region"]) == String.downcase(region) end)
-          |> Map.get("publicURL")
+        |> Keyword.get(:endpoints)
+        |> Enum.find(fn ep -> String.downcase(ep["region"]) == String.downcase(region) end)
+        |> Map.get("publicURL")
       end
 
       defp expired? do
-        if expire_date = Rackspace.Config.get[:expires_at] do
-          Timex.before?(Timex.parse!(expire_date, "{ISO:Extended}"), Timex.now)
+        if expire_date = Rackspace.Config.get()[:expires_at] do
+          Timex.before?(Timex.parse!(expire_date, "{ISO:Extended}"), Timex.now())
         else
           false
         end
       end
 
       defp get_auth do
-        auth = Rackspace.Config.get
+        auth = Rackspace.Config.get()
+
         if auth[:token] == nil || expired?() do
-          case Rackspace.Api.Identity.request do
-            {:ok } ->
-              Rackspace.Config.get
-            {:error, error } ->
+          case Rackspace.Api.Identity.request() do
+            {:ok} ->
+              Rackspace.Config.get()
+
+            {:error, error} ->
               raise "fail to authenticate"
           end
         else
-          Rackspace.Config.get
+          Rackspace.Config.get()
         end
       end
 
       defp validate_resp(resp) do
         case resp do
-          %HTTPotion.Response{status_code: status_code} when status_code >= 200 and status_code <= 300 ->
-            {:ok, resp}
-          %HTTPotion.Response{} ->
+          {:ok, %HTTPoison.Response{status_code: status_code} = data}
+          when status_code >= 200 and status_code <= 300 ->
+            {:ok, data}
+
+          {:ok, %HTTPoison.Response{status_code: status_code, body: message}} ->
             # validation and conflict errors in case 4XX errors and 500 should have empty body
-            {:error, %Rackspace.Error{code: resp.status_code, message: resp.body}}
-          %HTTPotion.ErrorResponse{message: message} ->
+            {:error, %Rackspace.Error{code: status_code, message: message}}
+
+          {:error, %HTTPoison.Error{reason: message}} ->
             {:error, %Rackspace.Error{code: 0, message: message}}
         end
       end
@@ -95,10 +101,14 @@ defmodule Rackspace.Api.Base do
             timeout = Keyword.get(opts, :timout, timeout)
 
             url
-              |> query_params(params)
-              |> HTTPotion.head([headers: [
-                "X-Auth-Token": token,
-              ], timeout: timeout])
+            |> query_params(params)
+            |> HTTPotion.head(
+              headers: [
+                "X-Auth-Token": token
+              ],
+              timeout: timeout
+            )
+
           _ ->
             %Rackspace.Error{code: 0, message: "token_expired"}
         end
@@ -111,11 +121,15 @@ defmodule Rackspace.Api.Base do
             timeout = Keyword.get(opts, :timout, timeout)
 
             url
-              |> query_params(params)
-              |> HTTPotion.get([headers: [
+            |> query_params(params)
+            |> HTTPoison.get(
+              [
                 "X-Auth-Token": token,
                 "Content-Type": "application/json"
-              ], timeout: timeout])
+              ],
+              recv_timeout: timeout
+            )
+
           _ ->
             %Rackspace.Error{code: 0, message: "token_expired"}
         end
@@ -126,11 +140,17 @@ defmodule Rackspace.Api.Base do
           %{token: token} when is_nil(token) == false ->
             timeout = Application.get_env(:rackspace, :timeout) || 5_000
             timeout = Keyword.get(opts, :timout, timeout)
+
             url
-              |> query_params(params)
-              |> HTTPotion.post([headers: [
+            |> query_params(params)
+            |> HTTPoison.post(
+              body,
+              [
                 "X-Auth-Token": token
-              ], body: body, timeout: timeout])
+              ],
+              recv_timeout: timeout
+            )
+
           _ ->
             %Rackspace.Error{code: 0, message: "token_expired"}
         end
@@ -141,13 +161,19 @@ defmodule Rackspace.Api.Base do
           %{token: token} when is_nil(token) == false ->
             timeout = Application.get_env(:rackspace, :timeout) || 5_000
             timeout = Keyword.get(opts, :timout, timeout)
-            expire_at = Keyword.get(params, :expire_at, 63072000)
+            expire_at = Keyword.get(params, :expire_at, 63_072_000)
+
             url
-              |> query_params(params)
-              |> HTTPotion.put([headers: [
+            |> query_params(params)
+            |> HTTPoison.put(
+              body,
+              [
                 "X-Auth-Token": token,
                 "X-Delete-After": expire_at
-              ], body: body, timeout: timeout])
+              ],
+              recv_timeout: timeout
+            )
+
           _ ->
             %Rackspace.Error{code: 0, message: "token_expired"}
         end
@@ -156,31 +182,40 @@ defmodule Rackspace.Api.Base do
       defp request_delete(url, params \\ [], opts \\ [], body \\ <<>>) do
         case get_auth() do
           %{token: token} when is_nil(token) == false ->
-            content_type =  opts[:content_type] || "application/json"
+            content_type = opts[:content_type] || "application/json"
             accept = opts[:accept] || "application/json"
             timeout = Application.get_env(:rackspace, :timeout) || 5_000
             timeout = Keyword.get(opts, :timout, timeout)
 
+            url =
               url
-                |> query_params(params)
-                |> HTTPotion.delete([headers: [
-                  "X-Auth-Token": token,
-                  "Content-Type": content_type,
-                  "Accept": accept
-                ], body: body, timeout: timeout])
+              |> query_params(params)
+
+            HTTPoison.request(
+              :delete,
+              url,
+              body,
+              [
+                Accept: accept
+              ],
+              timeout: timeout,
+              recv_timeout: timeout
+            )
+
           _ ->
             %Rackspace.Error{code: 0, message: "token_expired"}
         end
       end
 
       defp query_params(url, params) do
-        Enum.reduce(params, url, fn({k,v}, acc) ->
+        Enum.reduce(params, url, fn {k, v}, acc ->
           acc = "#{acc}&#{k}=#{v}"
         end)
       end
 
       defp get_temp_url_key(account_url) do
         temp_url_keys = Application.get_env(:rackspace, :temp_url_keys, %{})
+
         if Map.has_key?(temp_url_keys, account_url) do
           Map.get(temp_url_keys, account_url)
         else
@@ -190,7 +225,12 @@ defmodule Rackspace.Api.Base do
             |> Map.get(:headers)
             |> get_in(["x-account-meta-temp-url-key"])
 
-          Application.put_env(:rackspace, :temp_url_keys, Map.put(temp_url_keys, account_url, temp_url_key))
+          Application.put_env(
+            :rackspace,
+            :temp_url_keys,
+            Map.put(temp_url_keys, account_url, temp_url_key)
+          )
+
           temp_url_key
         end
       end
